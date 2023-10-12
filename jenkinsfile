@@ -1,0 +1,28 @@
+node{
+    stage('Pull source code from Github') {
+        git 'https://github.com/margreataru/webelight_practical_test.git'
+    }
+    
+    stage('Build Docker File'){
+        sh 'docker image build -t $JOB_NAME:v1.$BUILD_ID .'
+        sh 'docker image tag $JOB_NAME:v1.$BUILD_ID aravindmargreat/$JOB_NAME:v1.$BUILD_ID'
+        sh 'docker image tag $JOB_NAME:v1.$BUILD_ID aravindmargreat/$JOB_NAME:latest'
+    }
+    
+    stage('Push image to Docker Hub'){
+        withCredentials([string(credentialsId: 'dockerhubpas', variable: 'DOCKERHUBPAS')]) {
+            sh 'docker login -u aravindmargreat -p ${DOCKERHUBPAS}'
+            sh 'docker image push aravindmargreat/$JOB_NAME:v1.$BUILD_ID'
+            sh 'docker image push aravindmargreat/$JOB_NAME:latest'
+            sh 'docker image rmi $JOB_NAME:v1.$BUILD_ID aravindmargreat/$JOB_NAME:v1.$BUILD_ID aravindmargreat/$JOB_NAME:latest'
+        }
+    }
+    
+    stage('Deployment of Docker Container'){
+        def dockerrun = 'docker run -p 3001:3000 -d --name nodejsapp11 aravindmargreat/nodejs_app:latest'
+        
+        sshagent(['dockerhostpassword']) {
+            sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.0.37 ${dockerrun}"
+        }
+    }
+}
